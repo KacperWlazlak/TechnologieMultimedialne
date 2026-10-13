@@ -6,7 +6,15 @@
 <?php
 $user=$_POST['user']; // login z formularza
 $pass=$_POST['pass']; // hasło z formularza
-$link = mysqli_connect(localhost, nazwa_usera, hasło_usera, baza_usera); // połączenie z BD – wpisać swoje dane
+
+$link = mysqli_connect(
+    getenv('MYSQLHOST'),
+    getenv('MYSQLUSER'),
+    getenv('MYSQLPASSWORD'),
+    getenv('MYSQLDATABASE'),
+    (int) getenv('MYSQLPORT')
+);
+
 if(!$link) { echo"Błąd: ". mysqli_connect_errno()." ".mysqli_connect_error(); } // obsługa błędu połączenia z BD
 mysqli_query($link, "SET NAMES 'utf8'"); // ustawienie polskich znaków
 $result = mysqli_query($link, "SELECT * FROM users WHERE username='$user'"); // wiersza, w którym login=login z formularza
