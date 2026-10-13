@@ -11,7 +11,7 @@ $link = mysqli_connect(
     getenv('MYSQLHOST'),
     getenv('MYSQLUSER'),
     getenv('MYSQLPASSWORD'),
-    getenv('z1_'),
+    'z1_',
     (int) getenv('MYSQLPORT')
 );
 
