@@ -4,8 +4,8 @@
 </HEAD>
 <BODY>
 <?php
-$user=$_POST['user']; // login z formularza
-$pass=$_POST['pass']; // hasło z formularza
+$user = htmlentities($_POST['user'], ENT_QUOTES, "UTF-8");
+$pass = htmlentities($_POST['pass'], ENT_QUOTES, "UTF-8");
 
 $link = mysqli_connect(
     getenv('MYSQLHOST'),
