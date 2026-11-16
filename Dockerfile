@@ -1,4 +1,3 @@
-
 FROM php:8.3-apache
 
 # Instalacja rozszerzenia MySQL
@@ -11,11 +10,15 @@ RUN a2dismod mpm_event mpm_worker \
 # Kopiowanie plików aplikacji
 COPY . /var/www/html/
 
-# Utworzenie katalogu avatarów
-# i nadanie uprawnień użytkownikowi Apache
+# Uprawnienia do folderów avatarów LAB 2 i LAB 3
 RUN mkdir -p /var/www/html/z2/uploads \
-    && chown -R www-data:www-data /var/www/html/z2/uploads \
-    && chmod 775 /var/www/html/z2/uploads
+    /var/www/html/z3/uploads \
+    && chown -R www-data:www-data \
+    /var/www/html/z2/uploads \
+    /var/www/html/z3/uploads \
+    && chmod 775 \
+    /var/www/html/z2/uploads \
+    /var/www/html/z3/uploads
 
 # Port Apache
 EXPOSE 80
