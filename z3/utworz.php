@@ -1,22 +1,19 @@
 <?php
 require_once __DIR__ . '/config.php';
 
-$link->query("
-    CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(20) NOT NULL UNIQUE,
-        password VARCHAR(255) NOT NULL
-    )
-");
+try {
+    $link->query("
+        CREATE TABLE IF NOT EXISTS user_avatars (
+            user_id INT NOT NULL,
+            filename VARCHAR(100) NOT NULL DEFAULT 'default.svg',
+            PRIMARY KEY (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
 
-$link->query("
-    CREATE TABLE IF NOT EXISTS goscieportalu (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        ipaddress VARCHAR(45) NOT NULL,
-        datetime DATETIME NOT NULL
-            DEFAULT CURRENT_TIMESTAMP
-    )
-");
+    echo "Tabela user_avatars zostala utworzona!";
 
-echo "Tabele zostaly utworzone!";
+} catch (mysqli_sql_exception $e) {
+    error_log($e->getMessage());
+    echo "Blad podczas tworzenia tabeli.";
+}
 ?>
