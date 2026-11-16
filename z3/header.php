@@ -1,4 +1,3 @@
-
 <?php declare(strict_types=1); ?>
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
