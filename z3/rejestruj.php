@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pl">
 
@@ -6,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>Rejestracja – Lab 2</title>
+    <title>Rejestracja – Lab 3</title>
 
     <link
             href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
@@ -22,12 +21,12 @@
 
     <div class="card shadow-sm p-4">
 
-        <h1 class="h3">Rejestracja</h1>
+        <h1 class="h3">Rejestracja – LAB 3</h1>
 
         <?php if (isset($_GET['error'])): ?>
             <div class="alert alert-danger">
                 Nie udało się zarejestrować.
-                Sprawdź login, hasła i rozmiar zdjęcia.
+                Sprawdź login, hasła i format zdjęcia.
             </div>
         <?php endif; ?>
 
@@ -37,7 +36,6 @@
                 enctype="multipart/form-data"
         >
 
-            <!-- Login -->
             <label class="form-label">
                 Login (maks. 20 znaków)
             </label>
@@ -50,7 +48,6 @@
                     maxlength="20"
             >
 
-            <!-- Hasło -->
             <label class="form-label">
                 Hasło
             </label>
@@ -62,7 +59,6 @@
                     required
             >
 
-            <!-- Powtórzenie hasła -->
             <label class="form-label">
                 Powtórz hasło
             </label>
@@ -74,9 +70,8 @@
                     required
             >
 
-            <!-- Avatar -->
             <label class="form-label">
-                Avatar (opcjonalnie JPG/PNG/WEBP, maks. 2 MB)
+                Avatar (opcjonalnie JPG/PNG/WEBP)
             </label>
 
             <input
@@ -86,7 +81,6 @@
                     accept="image/jpeg,image/png,image/webp"
             >
 
-            <!-- Przyciski -->
             <button type="submit" class="btn btn-success">
                 Utwórz konto
             </button>
