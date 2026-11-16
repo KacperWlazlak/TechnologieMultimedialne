@@ -3,23 +3,19 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
 
-// Obsługa błędów rejestracji
 function fail(): never {
     header('Location: rejestruj.php?error=1');
     exit;
 }
 
-// Rejestracja tylko przez POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     fail();
 }
 
-// Pobranie danych z formularza
 $user = $_POST['user'] ?? '';
 $pass = $_POST['pass'] ?? '';
 $pass2 = $_POST['pass2'] ?? '';
 
-// Walidacja danych
 if (
     !is_string($user) ||
     !is_string($pass) ||
@@ -39,7 +35,7 @@ if (
     fail();
 }
 
-// Sprawdzenie, czy użytkownik istnieje
+// Sprawdzenie, czy login jest zajęty
 $check = $link->prepare(
     'SELECT id FROM users WHERE username = ? LIMIT 1'
 );
@@ -58,14 +54,13 @@ $check->close();
 $avatar = 'default.svg';
 $uploadedPath = null;
 
-// Obsługa przesłanego zdjęcia profilowego
+// Obsługa zdjęcia profilowego
 if (
     isset($_FILES['avatar']) &&
     $_FILES['avatar']['error'] !== UPLOAD_ERR_NO_FILE
 ) {
     $file = $_FILES['avatar'];
 
-    // Bez własnego limitu wielkości pliku
     if (
         $file['error'] !== UPLOAD_ERR_OK ||
         $file['size'] <= 0 ||
@@ -74,13 +69,13 @@ if (
         fail();
     }
 
-    // Sprawdzenie typu pliku
+    // Akceptowane formaty
     $mime = (new finfo(FILEINFO_MIME_TYPE))
         ->file($file['tmp_name']);
 
     $extensions = [
         'image/jpeg' => 'jpg',
-        'image/png'  => 'png',
+        'image/png' => 'png',
         'image/webp' => 'webp'
     ];
 
@@ -90,24 +85,31 @@ if (
         fail();
     }
 
-    // Folder na zdjęcia
-    $uploadDir = __DIR__ . '/uploads/';
+    // Trwały katalog na Railway Volume
+    $uploadDir = '/data/avatars/';
 
     if (!is_dir($uploadDir)) {
-        if (!mkdir($uploadDir, 0755, true)) {
+        if (!mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
+            error_log('Nie mozna utworzyc katalogu avatarow.');
             fail();
         }
     }
 
-    // Losowa nazwa pliku
+    if (!is_writable($uploadDir)) {
+        error_log('Brak uprawnien zapisu: ' . $uploadDir);
+        fail();
+    }
+
+    // Unikalna nazwa zdjęcia
     $avatar = bin2hex(random_bytes(16)) . '.' . $ext;
     $uploadedPath = $uploadDir . $avatar;
 
-    // Zapis zdjęcia
-    if (!move_uploaded_file(
+    // Zapis pliku bez wyswietlania warningow
+    if (!@move_uploaded_file(
         $file['tmp_name'],
         $uploadedPath
     )) {
+        error_log('Nie udalo sie zapisac avatara.');
         fail();
     }
 }
@@ -116,7 +118,6 @@ if (
 $hash = password_hash($pass, PASSWORD_DEFAULT);
 
 try {
-    // Rozpoczęcie transakcji
     $link->begin_transaction();
 
     // Dodanie użytkownika
@@ -128,9 +129,7 @@ try {
     $stmt->bind_param('ss', $user, $hash);
     $stmt->execute();
 
-    // ID nowego użytkownika
     $id = $link->insert_id;
-
     $stmt->close();
 
     // Zapis avatara w bazie
@@ -143,25 +142,19 @@ try {
     $stmt2->execute();
     $stmt2->close();
 
-    // Zatwierdzenie zmian
     $link->commit();
 
-    // Powrót do logowania
     header('Location: index.php?registered=1');
     exit;
 
 } catch (Throwable $e) {
-
-    // Cofnięcie zmian w bazie
     $link->rollback();
 
-    // Usunięcie przesłanego zdjęcia,
-    // jeśli zapis użytkownika się nie udał
     if ($uploadedPath !== null && is_file($uploadedPath)) {
-        unlink($uploadedPath);
+        @unlink($uploadedPath);
     }
 
-    error_log('Blad rejestracji LAB 3: ' . $e->getMessage());
+    error_log('Blad rejestracji: ' . $e->getMessage());
 
     fail();
 }
