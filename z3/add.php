@@ -1,21 +1,19 @@
 <?php
-declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
 
-function fail(): never {
+// Funkcja obsługi błędów rejestracji
+function fail(): void {
     header('Location: rejestruj.php?error=1');
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    fail();
-}
-
+// Pobranie danych z formularza
 $user = $_POST['user'] ?? '';
 $pass = $_POST['pass'] ?? '';
 $pass2 = $_POST['pass2'] ?? '';
 
+// Sprawdzenie typów danych
 if (
     !is_string($user) ||
     !is_string($pass) ||
@@ -26,6 +24,7 @@ if (
 
 $user = trim($user);
 
+// Walidacja danych
 if (
     $user === '' ||
     mb_strlen($user) > 20 ||
@@ -35,7 +34,7 @@ if (
     fail();
 }
 
-// Sprawdzenie, czy login jest zajęty
+// Sprawdzenie, czy użytkownik istnieje
 $check = $link->prepare(
     'SELECT id FROM users WHERE username = ? LIMIT 1'
 );
@@ -44,7 +43,6 @@ $check->bind_param('s', $user);
 $check->execute();
 
 if ($check->get_result()->fetch_assoc()) {
-    $check->close();
     fail();
 }
 
@@ -52,109 +50,78 @@ $check->close();
 
 // Domyślny avatar
 $avatar = 'default.svg';
-$uploadedPath = null;
 
-// Obsługa zdjęcia profilowego
+// Obsługa przesłanego avataru
 if (
     isset($_FILES['avatar']) &&
     $_FILES['avatar']['error'] !== UPLOAD_ERR_NO_FILE
 ) {
+
     $file = $_FILES['avatar'];
 
+    // Bez limitu wielkości zdjęcia w kodzie
     if (
         $file['error'] !== UPLOAD_ERR_OK ||
-        $file['size'] <= 0 ||
-        !is_uploaded_file($file['tmp_name'])
+        $file['size'] <= 0
     ) {
         fail();
     }
 
-    // Akceptowane formaty
+    // Sprawdzenie typu pliku
     $mime = (new finfo(FILEINFO_MIME_TYPE))
         ->file($file['tmp_name']);
 
-    $extensions = [
+    $ext = [
         'image/jpeg' => 'jpg',
-        'image/png' => 'png',
+        'image/png'  => 'png',
         'image/webp' => 'webp'
-    ];
+    ][$mime] ?? null;
 
-    $ext = $extensions[$mime] ?? null;
-
-    if ($ext === null) {
+    if (!$ext) {
         fail();
     }
 
-    // Trwały katalog na Railway Volume
-    $uploadDir = '/data/avatars/';
+    // Losowa nazwa pliku
+    $name = bin2hex(random_bytes(16)) . '.' . $ext;
 
-    if (!is_dir($uploadDir)) {
-        if (!mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
-            error_log('Nie mozna utworzyc katalogu avatarow.');
-            fail();
-        }
-    }
-
-    if (!is_writable($uploadDir)) {
-        error_log('Brak uprawnien zapisu: ' . $uploadDir);
-        fail();
-    }
-
-    // Unikalna nazwa zdjęcia
-    $avatar = bin2hex(random_bytes(16)) . '.' . $ext;
-    $uploadedPath = $uploadDir . $avatar;
-
-    // Zapis pliku bez wyswietlania warningow
+    // Zapis avataru
     if (!@move_uploaded_file(
         $file['tmp_name'],
-        $uploadedPath
+        __DIR__ . '/uploads/' . $name
     )) {
-        error_log('Nie udalo sie zapisac avatara.');
         fail();
     }
+
+    $avatar = $name;
 }
 
 // Haszowanie hasła
 $hash = password_hash($pass, PASSWORD_DEFAULT);
 
-try {
-    $link->begin_transaction();
+// Dodanie użytkownika do bazy
+$stmt = $link->prepare(
+    'INSERT INTO users (username, password)
+     VALUES (?, ?)'
+);
 
-    // Dodanie użytkownika
-    $stmt = $link->prepare(
-        'INSERT INTO users (username, password)
-         VALUES (?, ?)'
-    );
+$stmt->bind_param('ss', $user, $hash);
 
-    $stmt->bind_param('ss', $user, $hash);
-    $stmt->execute();
-
-    $id = $link->insert_id;
-    $stmt->close();
-
-    // Zapis avatara w bazie
-    $stmt2 = $link->prepare(
-        'INSERT INTO user_avatars (user_id, filename)
-         VALUES (?, ?)'
-    );
-
-    $stmt2->bind_param('is', $id, $avatar);
-    $stmt2->execute();
-    $stmt2->close();
-
-    $link->commit();
-
-    header('Location: index.php?registered=1');
-    exit;
-
-} catch (Throwable $e) {
-    $link->rollback();
-
-    if ($uploadedPath !== null && is_file($uploadedPath)) {
-        @unlink($uploadedPath);
-    }
-
-    error_log('Blad rejestracji: ' . $e->getMessage());
-
+if (!$stmt->execute()) {
     fail();
 }
+
+// Pobranie ID nowego użytkownika
+$id = $link->insert_id;
+
+// Zapis informacji o avatarze
+$stmt2 = $link->prepare(
+    'INSERT INTO user_avatars (user_id, filename)
+     VALUES (?, ?)'
+);
+
+$stmt2->bind_param('is', $id, $avatar);
+$stmt2->execute();
+
+// Przekierowanie po rejestracji
+header('Location: index.php?registered=1');
+exit;
