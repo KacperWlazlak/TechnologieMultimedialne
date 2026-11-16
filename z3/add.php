@@ -1,11 +1,17 @@
 <?php
+declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
 
-// Funkcja obsługi błędów rejestracji
-function fail(): void {
+// Obsługa błędów rejestracji
+function fail(): never {
     header('Location: rejestruj.php?error=1');
     exit;
+}
+
+// Rejestracja tylko przez POST
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    fail();
 }
 
 // Pobranie danych z formularza
@@ -13,7 +19,7 @@ $user = $_POST['user'] ?? '';
 $pass = $_POST['pass'] ?? '';
 $pass2 = $_POST['pass2'] ?? '';
 
-// Sprawdzenie typów danych
+// Walidacja danych
 if (
     !is_string($user) ||
     !is_string($pass) ||
@@ -24,7 +30,6 @@ if (
 
 $user = trim($user);
 
-// Walidacja danych bez limitu minimum 8 znaków
 if (
     $user === '' ||
     mb_strlen($user) > 20 ||
@@ -43,6 +48,7 @@ $check->bind_param('s', $user);
 $check->execute();
 
 if ($check->get_result()->fetch_assoc()) {
+    $check->close();
     fail();
 }
 
@@ -50,19 +56,20 @@ $check->close();
 
 // Domyślny avatar
 $avatar = 'default.svg';
+$uploadedPath = null;
 
-// Obsługa przesłanego avataru
+// Obsługa przesłanego zdjęcia profilowego
 if (
     isset($_FILES['avatar']) &&
     $_FILES['avatar']['error'] !== UPLOAD_ERR_NO_FILE
 ) {
-
     $file = $_FILES['avatar'];
 
+    // Bez własnego limitu wielkości pliku
     if (
         $file['error'] !== UPLOAD_ERR_OK ||
-        $file['size'] > 2097152 ||
-        $file['size'] <= 0
+        $file['size'] <= 0 ||
+        !is_uploaded_file($file['tmp_name'])
     ) {
         fail();
     }
@@ -71,57 +78,90 @@ if (
     $mime = (new finfo(FILEINFO_MIME_TYPE))
         ->file($file['tmp_name']);
 
-    $ext = [
+    $extensions = [
         'image/jpeg' => 'jpg',
         'image/png'  => 'png',
         'image/webp' => 'webp'
-    ][$mime] ?? null;
+    ];
 
-    if (!$ext) {
+    $ext = $extensions[$mime] ?? null;
+
+    if ($ext === null) {
         fail();
+    }
+
+    // Folder na zdjęcia
+    $uploadDir = __DIR__ . '/uploads/';
+
+    if (!is_dir($uploadDir)) {
+        if (!mkdir($uploadDir, 0755, true)) {
+            fail();
+        }
     }
 
     // Losowa nazwa pliku
-    $name = bin2hex(random_bytes(16)) . '.' . $ext;
+    $avatar = bin2hex(random_bytes(16)) . '.' . $ext;
+    $uploadedPath = $uploadDir . $avatar;
 
-    // Zapis avataru
+    // Zapis zdjęcia
     if (!move_uploaded_file(
         $file['tmp_name'],
-        __DIR__ . '/uploads/' . $name
+        $uploadedPath
     )) {
         fail();
     }
-
-    $avatar = $name;
 }
 
 // Haszowanie hasła
 $hash = password_hash($pass, PASSWORD_DEFAULT);
 
-// Dodanie użytkownika do bazy
-$stmt = $link->prepare(
-    'INSERT INTO users (username, password)
-     VALUES (?, ?)'
-);
+try {
+    // Rozpoczęcie transakcji
+    $link->begin_transaction();
 
-$stmt->bind_param('ss', $user, $hash);
+    // Dodanie użytkownika
+    $stmt = $link->prepare(
+        'INSERT INTO users (username, password)
+         VALUES (?, ?)'
+    );
 
-if (!$stmt->execute()) {
+    $stmt->bind_param('ss', $user, $hash);
+    $stmt->execute();
+
+    // ID nowego użytkownika
+    $id = $link->insert_id;
+
+    $stmt->close();
+
+    // Zapis avatara w bazie
+    $stmt2 = $link->prepare(
+        'INSERT INTO user_avatars (user_id, filename)
+         VALUES (?, ?)'
+    );
+
+    $stmt2->bind_param('is', $id, $avatar);
+    $stmt2->execute();
+    $stmt2->close();
+
+    // Zatwierdzenie zmian
+    $link->commit();
+
+    // Powrót do logowania
+    header('Location: index.php?registered=1');
+    exit;
+
+} catch (Throwable $e) {
+
+    // Cofnięcie zmian w bazie
+    $link->rollback();
+
+    // Usunięcie przesłanego zdjęcia,
+    // jeśli zapis użytkownika się nie udał
+    if ($uploadedPath !== null && is_file($uploadedPath)) {
+        unlink($uploadedPath);
+    }
+
+    error_log('Blad rejestracji LAB 3: ' . $e->getMessage());
+
     fail();
 }
-
-// Pobranie ID nowego użytkownika
-$id = $link->insert_id;
-
-// Zapis informacji o avatarze
-$stmt2 = $link->prepare(
-    'INSERT INTO user_avatars (user_id, filename)
-     VALUES (?, ?)'
-);
-
-$stmt2->bind_param('is', $id, $avatar);
-$stmt2->execute();
-
-// Przekierowanie po rejestracji
-header('Location: index.php?registered=1');
-exit;
