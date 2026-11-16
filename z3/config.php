@@ -1,22 +1,32 @@
 <?php
+// LAB 3 - polaczenie z osobna baza MySQL na Railway
+
 $host = getenv('Z3_DB_HOST');
-$port = getenv('Z3_DB_PORT') ?: 3306;
+$port = getenv('Z3_DB_PORT') ?: '3306';
 $dbname = getenv('Z3_DB_NAME');
 $user = getenv('Z3_DB_USER');
 $password = getenv('Z3_DB_PASSWORD');
 
+if (!$host || !$dbname || !$user || $password === false) {
+    error_log('Brak konfiguracji bazy danych LAB 3.');
+    exit('Blad konfiguracji bazy danych.');
+}
+
 try {
-    $pdo = new PDO(
-        "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4",
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+    $link = new mysqli(
+        $host,
         $user,
         $password,
-        [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-        ]
+        $dbname,
+        (int)$port
     );
-} catch (PDOException $e) {
-    error_log($e->getMessage());
-    exit("Błąd połączenia z bazą danych.");
+
+    $link->set_charset('utf8mb4');
+
+} catch (mysqli_sql_exception $e) {
+    error_log('LAB 3 MySQL: ' . $e->getMessage());
+    exit('Blad polaczenia z baza danych.');
 }
 ?>
